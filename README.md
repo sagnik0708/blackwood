@@ -8,7 +8,7 @@ A **Godot 4.3 survival RPG vertical slice** targeting **Web/HTML5** (desktop bro
 
 ## Quick start (local)
 
-1. Install [Godot 4.3](https://godotengine.org/download) (standard build, no addons).
+1. Install [Godot 4.3](https://godotengine.org/download) (standard build, no addons)
 2. Open this folder as a project (`project.godot`).
 3. Press **F5** / Play. First import takes a few seconds.
 
