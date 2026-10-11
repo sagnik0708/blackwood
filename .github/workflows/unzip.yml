@@ -1,20 +1,49 @@
 name: Unzip upload
-on: workflow_dispatch
+on:
+  workflow_dispatch
+
 permissions:
   contents: write
+
 jobs:
   unzip:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Unzip and commit
+        shell: bash
         run: |
-          unzip -o blackwood-valley-outbreak.zip
-          rm -rf blackwood-valley-outbreak/.github
-          cp -r blackwood-valley-outbreak/. .
-          rm -rf blackwood-valley-outbreak blackwood-valley-outbreak.zip
+          set -euo pipefail
+
+          zip_file="$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)"
+          if [[ -z "${zip_file}" ]]; then
+            echo "No .zip file found in repository root"
+            exit 1
+          fi
+
+          tmp_dir="$(mktemp -d)"
+          unzip -o "$zip_file" -d "$tmp_dir"
+
+          extracted_dir="$(find "$tmp_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          if [[ -z "${extracted_dir:-}" ]]; then
+            echo "No extracted folder found inside $zip_file"
+            exit 1
+          fi
+
+          rm -rf "$extracted_dir/.github"
+          cp -a "$extracted_dir"/. .
+
+          rm -rf "$tmp_dir" "$zip_file"
+
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
           git commit -m "Import project from zip"
           git push
