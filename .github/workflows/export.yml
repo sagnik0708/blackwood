@@ -1,0 +1,86 @@
+name: Build & Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Headless smoke test & web export
+    runs-on: ubuntu-latest
+    container: barichello/godot-ci:4.3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install export templates
+        run: |
+          set -euo pipefail
+          TPL_DIR="$HOME/.local/share/godot/export_templates"
+          mkdir -p "$TPL_DIR"
+          for SRC in "/root/.local/share/godot/export_templates/4.3.stable" "/usr/local/share/godot/export_templates/4.3.stable"; do
+            if [ -d "$SRC" ] && [ ! -d "$TPL_DIR/4.3.stable" ]; then
+              cp -R "$SRC" "$TPL_DIR/4.3.stable"
+              echo "Installed templates from $SRC"
+            fi
+          done
+          ls -la "$TPL_DIR"
+
+      - name: Import project resources
+        run: godot --headless --path . --import
+
+      - name: Headless smoke test (parses and runs every script)
+        run: |
+          godot --headless --path . --quit-after 6000 2>&1 | tee smoke.log
+          grep -q "SMOKE TEST COMPLETE" smoke.log || { echo "::error::Smoke test did not complete"; exit 1; }
+          if grep -q "SCRIPT ERROR" smoke.log; then
+            echo "::error::Script errors detected during smoke test"
+            grep -n "SCRIPT ERROR" smoke.log
+            exit 1
+          fi
+
+      - name: Export Web build
+        run: |
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" "build/web/index.html"
+          ls -la build/web
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: web-build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web-build
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
