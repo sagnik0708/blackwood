@@ -1,0 +1,10 @@
+# Godot 4 generated cache
+.godot/
+
+# Local export output (CI builds this)
+build/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+*.tmp
